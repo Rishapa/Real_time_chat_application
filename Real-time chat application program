@@ -1,0 +1,172 @@
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+// Singleton to manage the state of chat rooms
+class ChatRoomManager {
+    private static ChatRoomManager instance;
+    private Map<String, ChatRoom> chatRooms;
+
+    private ChatRoomManager() {
+        chatRooms = new ConcurrentHashMap<>();
+    }
+
+    public static synchronized ChatRoomManager getInstance() {
+        if (instance == null) {
+            instance = new ChatRoomManager();
+        }
+        return instance;
+    }
+
+    public ChatRoom getChatRoom(String roomId) {
+        return chatRooms.computeIfAbsent(roomId, ChatRoom::new);
+    }
+}
+
+// Observer pattern for notifying clients of new messages or user activities
+interface ChatObserver {
+    void update(String message);
+}
+
+class ChatUser implements ChatObserver {
+    private String username;
+
+    public ChatUser(String username) {
+        this.username = username;
+    }
+
+    @Override
+    public void update(String message) {
+        System.out.println("[" + username + "] " + message);
+    }
+
+    public String getUsername() {
+        return username;
+    }
+}
+
+class ChatRoom {
+    private String roomId;
+    private Set<ChatUser> users;
+    private List<String> messageHistory;
+
+    public ChatRoom(String roomId) {
+        this.roomId = roomId;
+        this.users = ConcurrentHashMap.newKeySet();
+        this.messageHistory = Collections.synchronizedList(new ArrayList<>());
+    }
+
+    public void joinRoom(ChatUser user) {
+        users.add(user);
+        notifyUsers(user.getUsername() + " has joined the chat.");
+    }
+
+    public void leaveRoom(ChatUser user) {
+        users.remove(user);
+        notifyUsers(user.getUsername() + " has left the chat.");
+    }
+
+    public void sendMessage(ChatUser user, String message) {
+        String formattedMessage = user.getUsername() + ": " + message;
+        messageHistory.add(formattedMessage);
+        notifyUsers(formattedMessage);
+    }
+
+    public void notifyUsers(String message) {
+        for (ChatObserver user : users) {
+            user.update(message);
+        }
+    }
+
+    public List<String> getMessageHistory() {
+        return new ArrayList<>(messageHistory);
+    }
+
+    public Set<String> getActiveUsers() {
+        Set<String> activeUsernames = new HashSet<>();
+        for (ChatUser user : users) {
+            activeUsernames.add(user.getUsername());
+        }
+        return activeUsernames;
+    }
+}
+
+public class RealTimeChatApp {
+    private static Scanner scanner = new Scanner(System.in);
+    private static ChatRoomManager chatRoomManager = ChatRoomManager.getInstance();
+
+    public static void main(String[] args) {
+        while (true) {
+            System.out.print("Enter command (join/create/send/leave/list/exit): ");
+            String command = scanner.nextLine().trim();
+            switch (command) {
+                case "join":
+                    joinRoom();
+                    break;
+                case "create":
+                    createRoom();
+                    break;
+                case "send":
+                    sendMessage();
+                    break;
+                case "leave":
+                    leaveRoom();
+                    break;
+                case "list":
+                    listUsers();
+                    break;
+                case "exit":
+                    System.out.println("Exiting...");
+                    return;
+                default:
+                    System.out.println("Invalid command.");
+            }
+        }
+    }
+
+    private static void joinRoom() {
+        System.out.print("Enter room ID: ");
+        String roomId = scanner.nextLine().trim();
+        ChatRoom room = chatRoomManager.getChatRoom(roomId);
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine().trim();
+        ChatUser user = new ChatUser(username);
+        room.joinRoom(user);
+    }
+
+    private static void createRoom() {
+        System.out.print("Enter room ID: ");
+        String roomId = scanner.nextLine().trim();
+        chatRoomManager.getChatRoom(roomId);
+        System.out.println("Room " + roomId + " created.");
+    }
+
+    private static void sendMessage() {
+        System.out.print("Enter room ID: ");
+        String roomId = scanner.nextLine().trim();
+        ChatRoom room = chatRoomManager.getChatRoom(roomId);
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine().trim();
+        ChatUser user = new ChatUser(username);
+        System.out.print("Enter your message: ");
+        String message = scanner.nextLine().trim();
+        room.sendMessage(user, message);
+    }
+
+    private static void leaveRoom() {
+        System.out.print("Enter room ID: ");
+        String roomId = scanner.nextLine().trim();
+        ChatRoom room = chatRoomManager.getChatRoom(roomId);
+        System.out.print("Enter your username: ");
+        String username = scanner.nextLine().trim();
+        ChatUser user = new ChatUser(username);
+        room.leaveRoom(user);
+    }
+
+    private static void listUsers() {
+        System.out.print("Enter room ID: ");
+        String roomId = scanner.nextLine().trim();
+        ChatRoom room = chatRoomManager.getChatRoom(roomId);
+        Set<String> activeUsers = room.getActiveUsers();
+        System.out.println("Active users in " + roomId + ": " + activeUsers);
+    }
+}
